@@ -20,7 +20,7 @@ To move resources from one module in your android project to another run the fol
 ./gradlew moveResources -PfromModule="Example-From-Module-Name" -PtoModule="Example-To-Module-Name"`
 ```
 
-### Deleting used Resources
+### Deleting Unused Resources
 
 To remove resources from a module that are not referenced anywhere in code run:
 
