@@ -1,0 +1,128 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2021 Shopify Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+var resourceMoverBinaryPath = "PATH_TO_RESOURCE_MOVER_BINARY"
+
+task moveResources() {
+    doLast {
+        if (!project.hasProperty("fromModule")) {
+            throw new IllegalArgumentException("You must pass in the target module using -PfromModule=...")
+        }
+
+        if (!project.hasProperty("toModule")) {
+            throw new IllegalArgumentException("You must pass in the target module using -PtoModule=...")
+        }
+
+        var dependencyArgs = listProjectsDependentOn(fromModule)
+            .findAll { dependentProject ->
+                dependentProject.name != toModule
+            }
+            .collect { dependentProject ->
+                ["-d", dependentProject.projectDir.path]
+            }
+            .flatten()
+
+        exec {
+            setCommandLine(
+                [
+                    'java',
+                    '-jar',
+                    resourceMoverBinaryPath,
+                    'move',
+                    '-s', project.subprojects.find { p -> p.name == fromModule }.projectDir.path,
+                    '-o', project.subprojects.find { p -> p.name == toModule }.projectDir.path
+                ] + dependencyArgs
+            )
+        }
+    }
+}
+
+task removeResources() {
+    doLast {
+        if (!project.hasProperty("fromModule")) {
+            throw new IllegalArgumentException("You must pass in the target module using -PfromModule=...")
+        }
+
+        var dependencyArgs = listProjectsDependentOn(fromModule)
+            .collect { dependentProject ->
+                ["-d", dependentProject.projectDir.path]
+            }
+            .flatten()
+
+        exec {
+            setCommandLine(
+                [
+                    'java',
+                    '-jar',
+                    resourceMoverBinaryPath,
+                    'remove',
+                    '-s', project.subprojects.find { p -> p.name == fromModule }.projectDir.path,
+                ] + dependencyArgs
+            )
+        }
+    }
+}
+
+private List<Project> listProjectsDependentOn(String targetModule)  {
+    List<Project> projectsDependentOnTarget = []
+    List<String> projectNamesToVisit = [targetModule]
+    Set<String> projectNamesDependentOnTargetVisited = new HashSet<>()
+
+    while (!projectNamesToVisit.isEmpty()) {
+        String projectNameToVisit = projectNamesToVisit.remove(0)
+
+        subprojects.each { project ->
+            project.configurations.each { configuration ->
+                if (configuration.name.endsWith("Classpath")) {
+                    return
+                }
+
+                if (projectNamesToVisit.contains(project.name) || projectNamesDependentOnTargetVisited.contains(project.name)) {
+                    return
+                }
+
+                boolean dependsOnTargetModule = configuration.dependencies.any { dependency ->
+                    if (dependency instanceof ProjectDependency) {
+                        Project depProject = ((ProjectDependency) dependency)?.dependencyProject
+                        return depProject.name == projectNameToVisit
+                    } else {
+                        return false
+                    }
+                }
+
+                if (dependsOnTargetModule) {
+                    projectNamesToVisit.add(project.name)
+
+                    if (project.name != targetModule) {
+                        projectsDependentOnTarget.add(project)
+                    }
+                }
+            }
+        }
+
+        projectNamesDependentOnTargetVisited.add(projectNameToVisit)
+    }
+
+    return projectsDependentOnTarget
+}
