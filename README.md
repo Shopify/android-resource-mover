@@ -5,9 +5,10 @@ ResourceMover is a command line tool that helps bulk manage resources in an Andr
 ## Installation
 
 1) Clone project
-2) Build CLI jar using `./gradlew publishBinary`. This will build the jar into `./libs` in this project's directory.
+2) Build CLI jar using `./gradlew publishBinary`. This will build the jar into `./libs` in this project's directory
 3) Copy the `resource-mover.gradle` script into your projects root directory
-4) Apply the script in your root `build.gradle` using `apply from: "resource-mover.gradle"`
+4) Update the `resourceMoverBinaryPath` in the copied `resource-mover.gradle` to point to the jar built in step 2
+5) Apply the script in your root `build.gradle` using `apply from: "resource-mover.gradle"`
 
 ## Usage
 
